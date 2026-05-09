@@ -37,7 +37,7 @@ Daily morning briefing for Archon maintainers. Pulls latest `dev`, fetches all o
    - `maintainer-standup-git-status.ts` — fetches `origin/dev`, fast-forwards if safe, captures new commits + diff stat since the last recorded SHA.
    - `maintainer-standup-gh-data.ts` — pulls open PRs (full metadata), review-requested PRs, authored-by-me PRs, assigned issues, recently-filed unlabeled issues, and recently-closed PRs/issues since the last run.
    - `maintainer-standup-read-context.ts` — reads `direction.md`, `profile.md`, `state.json`, and the last 3 briefs.
-2. **Synthesis node** (`command: maintainer-standup`, Claude Sonnet, structured output) reads everything, optionally drills into specific PRs/issues with `gh pr view` / `gh issue view`, classifies P1–P4 against `direction.md`, and returns `{ brief_markdown, next_state }`.
+2. **Synthesis node** (`command: maintainer-standup`, Claude Sonnet, structured output) reads everything, optionally drills into specific MRs/issues with `glab mr view` / `glab issue view`, classifies P1–P4 against `direction.md`, and returns `{ brief_markdown, next_state }`.
 3. **Persist node** writes `brief_markdown` to `briefs/YYYY-MM-DD.md` and `next_state` to `state.json`.
 
 The workflow runs **in the live checkout** (`worktree.enabled: false`) — it has to read this folder and pull `dev`. `--branch` and `--no-worktree` flags are rejected.

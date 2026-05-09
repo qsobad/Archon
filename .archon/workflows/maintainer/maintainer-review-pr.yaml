@@ -59,23 +59,29 @@ nodes:
         exit 1
       fi
       echo "$PR_NUM" > "$ARTIFACTS_DIR/.pr-number"
-      gh pr view "$PR_NUM" --json number,title,body,labels,comments,reviews,state,mergeable,mergeStateStatus,additions,deletions,changedFiles,files,author,createdAt,updatedAt,baseRefName,headRefName,reviewDecision,reviewRequests,isDraft
+      # GitLab MR JSON: iid, title, description, labels, state, merge_status,
+      # source_branch, target_branch, author, created_at, updated_at, draft,
+      # web_url. additions/deletions/changedFiles aren't in glab mr view —
+      # derive from `git diff --shortstat origin/<target>...origin/<source>`
+      # if needed downstream. comments/reviews come from
+      # `glab mr note list "$PR_NUM" -F json` and merged into the gate's view.
+      glab mr view "$PR_NUM" -F json
     depends_on: [extract-pr-number]
     timeout: 30000
 
   - id: fetch-diff
     bash: |
       PR_NUM=$(cat "$ARTIFACTS_DIR/.pr-number")
-      # Don't redirect stderr — let auth / network / deleted-PR failures surface
+      # Don't redirect stderr — let auth / network / deleted-MR failures surface
       # as a node failure rather than feeding an empty diff to the gate (which
       # would produce a confident verdict on no evidence).
-      if ! diff_output=$(gh pr diff "$PR_NUM"); then
-        echo "ERROR: gh pr diff failed for PR #$PR_NUM" >&2
+      if ! diff_output=$(glab mr diff "$PR_NUM"); then
+        echo "ERROR: glab mr diff failed for MR !$PR_NUM" >&2
         exit 1
       fi
       # Cap at 2500 lines to keep prompt size bounded; gate cares about shape, not every line.
       if [ -z "$diff_output" ]; then
-        echo "(empty diff — PR has no changes)"
+        echo "(empty diff — MR has no changes)"
       else
         echo "$diff_output" | head -2500
       fi
@@ -244,8 +250,8 @@ nodes:
         echo "ERROR: review-comment.md missing — synthesize did not write it" >&2
         exit 1
       fi
-      gh pr comment "$PR_NUM" --body-file "$ARTIFACTS_DIR/review/review-comment.md"
-      echo "Posted review comment to PR #$PR_NUM"
+      glab mr note create "$PR_NUM" --message "$(cat "$ARTIFACTS_DIR/review/review-comment.md")"
+      echo "Posted review note to MR !$PR_NUM"
     depends_on: [synthesize-review]
     timeout: 30000
 
@@ -285,21 +291,21 @@ nodes:
         echo "ERROR: decline-comment.md missing — gate command did not write it" >&2
         exit 1
       fi
-      gh pr comment "$PR_NUM" --body-file "$ARTIFACTS_DIR/decline-comment.md"
+      glab mr note create "$PR_NUM" --message "$(cat "$ARTIFACTS_DIR/decline-comment.md")"
 
-      # Tag the PR so the morning brief can surface "awaiting author".
+      # Tag the MR so the morning brief can surface "awaiting author".
       # Failure (label not present in repo, permissions, etc.) is non-fatal,
       # but record the actual outcome so the report node doesn't claim the
       # label was applied when it wasn't.
-      if gh pr edit "$PR_NUM" --add-label awaiting-author 2>"$ARTIFACTS_DIR/.label-error"; then
+      if glab mr update "$PR_NUM" --label awaiting-author 2>"$ARTIFACTS_DIR/.label-error"; then
         echo "applied" > "$ARTIFACTS_DIR/.label-applied"
         rm -f "$ARTIFACTS_DIR/.label-error"
       else
         echo "skipped" > "$ARTIFACTS_DIR/.label-applied"
-        echo "WARN: gh pr edit --add-label failed; see $ARTIFACTS_DIR/.label-error" >&2
+        echo "WARN: glab mr update --label failed; see $ARTIFACTS_DIR/.label-error" >&2
       fi
 
-      echo "Posted decline comment to PR #$PR_NUM"
+      echo "Posted decline note to MR !$PR_NUM"
     depends_on: [approve-decline]
     timeout: 30000
 
