@@ -50,8 +50,8 @@ nodes:
         - If it's an existing plan → summarize it and ask if they want to refine or proceed
         - If it's a PRD → identify the specific phase/feature to focus on
 
-        **If it's a GitHub issue** (`#123` format):
-        - Fetch it: `gh issue view {number} --json title,body,labels,comments`
+        **If it's a GitLab issue** (`#123` format):
+        - Fetch it: `glab issue view {number} -F json` (parse `.title`, `.description`, `.labels`, then `glab issue note list {number} -F json` for comments)
         - Summarize the issue context
 
         **If it's free text**:
@@ -712,22 +712,22 @@ nodes:
 
       Read `$ARTIFACTS_DIR/plan.md` and `$ARTIFACTS_DIR/progress.txt` for context.
 
-      ## Step 3: Create PR (if not already created)
+      ## Step 3: Create MR (if not already created)
 
       ```bash
-      gh pr view HEAD --json url 2>/dev/null || echo "NO_PR"
+      glab mr view -F json 2>/dev/null | jq -r '.web_url' || echo "NO_MR"
       ```
 
-      If no PR exists:
+      If no MR exists:
 
       ```bash
-      cat .github/pull_request_template.md 2>/dev/null || echo "NO_TEMPLATE"
+      cat .gitlab/merge_request_templates/Default.md 2>/dev/null || echo "NO_TEMPLATE"
       ```
 
-      Create with `gh pr create --draft --base $BASE_BRANCH`:
+      Create with `glab mr create --draft --target-branch $BASE_BRANCH --yes`:
       - Title from the plan's feature name
-      - Body summarizing the implementation
-      - Use a HEREDOC for the body
+      - Description summarizing the implementation
+      - Use a HEREDOC for the description (passed via `--description "$(cat <<EOF ... EOF)"`)
 
       ## Step 4: Output Summary
 
@@ -759,12 +759,13 @@ nodes:
     bash: |
       set -euo pipefail
       EXPECTED="$BASE_BRANCH"
-      ACTUAL=$(gh pr view --json baseRefName -q '.baseRefName')
+      MR_JSON=$(glab mr view -F json)
+      ACTUAL=$(echo "$MR_JSON" | jq -r '.target_branch')
       if [ "$ACTUAL" != "$EXPECTED" ]; then
-        PR_NUMBER=$(gh pr view --json number -q '.number')
-        echo "Base mismatch on PR #$PR_NUMBER: expected=$EXPECTED actual=$ACTUAL — re-targeting" >&2
-        gh pr edit "$PR_NUMBER" --base "$EXPECTED"
+        MR_NUMBER=$(echo "$MR_JSON" | jq -r '.iid')
+        echo "Target mismatch on MR !$MR_NUMBER: expected=$EXPECTED actual=$ACTUAL — re-targeting" >&2
+        glab mr update "$MR_NUMBER" --target-branch "$EXPECTED"
       else
-        echo "PR base verified: $EXPECTED"
+        echo "MR target verified: $EXPECTED"
       fi
     depends_on: [finalize]
