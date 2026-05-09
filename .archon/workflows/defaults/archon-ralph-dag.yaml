@@ -522,13 +522,13 @@ nodes:
            ```
 
         2. **Read the PR template:**
-           Look for a PR template in the repo — check `.github/pull_request_template.md`, `.github/PULL_REQUEST_TEMPLATE.md`, and `docs/pull_request_template.md`. Read whichever one exists.
+           Look for an MR template in the repo — check `.gitlab/merge_request_templates/Default.md`, `.gitlab/merge_request_templates/default.md`, and `docs/MERGE_REQUEST_TEMPLATE.md`. Read whichever one exists.
 
            If a template was found, fill in **every section** using the context from this implementation. Don't skip sections or leave placeholders — fill them honestly based on the actual changes (summary, architecture, validation evidence, security, compatibility, rollback, etc.).
 
            If no template was found, write a summary with: problem, what changed, stories table, and validation evidence.
 
-        3. **Create a draft PR** using `gh pr create --draft --base $BASE_BRANCH --title "feat: {PRD feature name}"` with the filled-in template as the body. Use a HEREDOC for the body.
+        3. **Create a draft MR** using `glab mr create --draft --target-branch $BASE_BRANCH --title "feat: {PRD feature name}" --yes` with the filled-in template passed via `--description "$(cat <<'EOF' ... EOF)"`.
 
         4. **Output completion signal:**
            ```
@@ -652,13 +652,14 @@ nodes:
     bash: |
       set -euo pipefail
       EXPECTED="$BASE_BRANCH"
-      ACTUAL=$(gh pr view --json baseRefName -q '.baseRefName')
+      MR_JSON=$(glab mr view -F json)
+      ACTUAL=$(echo "$MR_JSON" | jq -r '.target_branch')
       if [ "$ACTUAL" != "$EXPECTED" ]; then
-        PR_NUMBER=$(gh pr view --json number -q '.number')
-        echo "Base mismatch on PR #$PR_NUMBER: expected=$EXPECTED actual=$ACTUAL — re-targeting" >&2
-        gh pr edit "$PR_NUMBER" --base "$EXPECTED"
+        MR_NUMBER=$(echo "$MR_JSON" | jq -r '.iid')
+        echo "Target mismatch on MR !$MR_NUMBER: expected=$EXPECTED actual=$ACTUAL — re-targeting" >&2
+        glab mr update "$MR_NUMBER" --target-branch "$EXPECTED"
       else
-        echo "PR base verified: $EXPECTED"
+        echo "MR target verified: $EXPECTED"
       fi
     depends_on: [implement]
 
@@ -705,10 +706,10 @@ nodes:
       git diff --stat $(git merge-base HEAD $BASE_BRANCH)..HEAD
       ```
 
-      ### 3. Check PR Status
+      ### 3. Check MR Status
 
       ```bash
-      gh pr view HEAD --json url,number,state 2>/dev/null || echo "No PR found"
+      glab mr view -F json 2>/dev/null | jq -r '"\(.web_url) !\(.iid) \(.state)"' || echo "No MR found"
       ```
 
       ### 4. Generate Report
