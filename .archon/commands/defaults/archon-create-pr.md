@@ -21,20 +21,19 @@ BRANCH=$(git branch --show-current)
 ISSUE_NUM=$(echo "$BRANCH" | grep -oE '[0-9]+' | tail -1)
 ```
 
-If an issue number was found, search for open PRs that already reference it:
+If an issue number was found, search for open MRs that already reference it:
 
 ```bash
-gh pr list \
-  --search "Fixes #${ISSUE_NUM} OR Closes #${ISSUE_NUM}" \
-  --state open \
-  --json number,url,headRefName
+glab mr list \
+  --search "Closes #${ISSUE_NUM}" \
+  -F json
 ```
 
-**If a matching PR is returned**: stop here, report the existing PR URL, and do **not** proceed to Phase 2 or Phase 3.
+**If a matching MR is returned**: stop here, report the existing MR URL (`web_url`), and do **not** proceed to Phase 2 or Phase 3.
 
 ```
-Existing PR found for issue #${ISSUE_NUM}: [url]
-Skipping PR creation.
+Existing MR found for issue #${ISSUE_NUM}: [web_url]
+Skipping MR creation.
 ```
 
 **If no match is found** (or no issue number could be extracted): continue to Phase 1.
@@ -97,9 +96,9 @@ git push -u origin HEAD
 
 ## Phase 3: Create PR
 
-### 3.1 Check for PR Template
+### 3.1 Check for MR Template
 
-Look for the project's PR template at `.github/pull_request_template.md`, `.github/PULL_REQUEST_TEMPLATE.md`, or `docs/PULL_REQUEST_TEMPLATE.md`. Read whichever one exists.
+Look for the project's MR template at `.gitlab/merge_request_templates/Default.md`, `.gitlab/merge_request_templates/default.md`, or `docs/MERGE_REQUEST_TEMPLATE.md`. Read whichever one exists.
 
 **If template found**: Use it as the structure, fill in **every section** with details from the implementation report and commits. Don't skip sections or leave placeholders.
 
@@ -130,16 +129,16 @@ Look for the project's PR template at `.github/pull_request_template.md`, `.gith
 
 ---
 
-[If from a GitHub issue, add: Closes #XXX]
+[If from a GitLab issue, add: Closes #XXX]
 ```
 
-### 3.2 Determine PR Title
+### 3.2 Determine MR Title
 
 **Title**: Concise, imperative mood
 - From implementation report summary, OR
 - From commit messages
 
-### 3.3 Create the PR
+### 3.3 Create the MR
 
 ```bash
 # Write body to file to avoid shell escaping
@@ -147,30 +146,31 @@ cat > $ARTIFACTS_DIR/pr-body.md <<'EOF'
 [body from above]
 EOF
 
-gh pr create \
+glab mr create \
   --title "[title]" \
-  --body-file $ARTIFACTS_DIR/pr-body.md \
-  --base $BASE_BRANCH
+  --description "$(cat $ARTIFACTS_DIR/pr-body.md)" \
+  --target-branch $BASE_BRANCH \
+  --yes
 ```
 
 Or if the content is simple:
 
 ```bash
-gh pr create --fill --base $BASE_BRANCH
+glab mr create --fill --target-branch $BASE_BRANCH --yes
 ```
 
-After creating the PR, capture its identifiers for downstream steps. Only write artifacts if PR creation succeeded — never persist stale data from a pre-existing PR:
+After creating the MR, capture its identifiers for downstream steps. Only write artifacts if MR creation succeeded — never persist stale data from a pre-existing MR:
 
 ```bash
-# After creating the PR, capture and persist the PR number for downstream steps
-# IMPORTANT: Only write artifacts after confirmed successful PR creation
-if gh pr view --json number,url -q '.number,.url' > /dev/null 2>&1; then
-  PR_NUMBER=$(gh pr view --json number -q '.number')
-  PR_URL=$(gh pr view --json url -q '.url')
-  echo "$PR_NUMBER" > "$ARTIFACTS_DIR/.pr-number"
-  echo "$PR_URL" > "$ARTIFACTS_DIR/.pr-url"
+# After creating the MR, capture and persist the MR number for downstream steps
+# IMPORTANT: Only write artifacts after confirmed successful MR creation
+if MR_JSON=$(glab mr view -F json 2>/dev/null); then
+  MR_NUMBER=$(echo "$MR_JSON" | jq -r '.iid')
+  MR_URL=$(echo "$MR_JSON" | jq -r '.web_url')
+  echo "$MR_NUMBER" > "$ARTIFACTS_DIR/.pr-number"
+  echo "$MR_URL" > "$ARTIFACTS_DIR/.pr-url"
 else
-  echo "WARNING: Could not confirm PR creation; skipping .pr-number/.pr-url artifacts"
+  echo "WARNING: Could not confirm MR creation; skipping .pr-number/.pr-url artifacts"
 fi
 ```
 
@@ -181,14 +181,14 @@ fi
 Report the result:
 
 ```markdown
-## PR Created
+## MR Created
 
-**URL**: [PR URL]
-**Branch**: [branch-name] → [base-branch]
-**Title**: [PR title]
+**URL**: [MR URL]
+**Branch**: [branch-name] → [target-branch]
+**Title**: [MR title]
 
 ### Summary
-[Brief summary of what the PR contains]
+[Brief summary of what the MR contains]
 
 ### Next Steps
 1. Request review if needed
@@ -204,19 +204,19 @@ Report the result:
 
 ```
 No commits between origin/$BASE_BRANCH and HEAD.
-Nothing to create a PR for.
+Nothing to create an MR for.
 ```
 
-### Branch Already Has PR
+### Branch Already Has MR
 
 ```bash
-gh pr view --web
+glab mr view --web
 ```
 
-Opens the existing PR instead of creating a duplicate.
+Opens the existing MR instead of creating a duplicate.
 
 ### Push Fails
 
 1. Check if branch exists remotely: `git ls-remote --heads origin [branch]`
 2. If conflicts: `git pull --rebase origin $BASE_BRANCH` then retry push
-3. If permission issues: Check GitHub access
+3. If permission issues: Check GitLab access

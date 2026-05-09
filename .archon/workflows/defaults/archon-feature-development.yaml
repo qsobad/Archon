@@ -19,12 +19,13 @@ nodes:
     bash: |
       set -euo pipefail
       EXPECTED="$BASE_BRANCH"
-      ACTUAL=$(gh pr view --json baseRefName -q '.baseRefName')
+      MR_JSON=$(glab mr view -F json)
+      ACTUAL=$(echo "$MR_JSON" | jq -r '.target_branch')
       if [ "$ACTUAL" != "$EXPECTED" ]; then
-        PR_NUMBER=$(gh pr view --json number -q '.number')
-        echo "Base mismatch on PR #$PR_NUMBER: expected=$EXPECTED actual=$ACTUAL — re-targeting" >&2
-        gh pr edit "$PR_NUMBER" --base "$EXPECTED"
+        MR_NUMBER=$(echo "$MR_JSON" | jq -r '.iid')
+        echo "Target mismatch on MR !$MR_NUMBER: expected=$EXPECTED actual=$ACTUAL — re-targeting" >&2
+        glab mr update "$MR_NUMBER" --target-branch "$EXPECTED"
       else
-        echo "PR base verified: $EXPECTED"
+        echo "MR target verified: $EXPECTED"
       fi
     depends_on: [create-pr]
