@@ -15,7 +15,7 @@ You are a test-focused reviewer. Run **only** when the diff touches source code 
 
 ```bash
 PR_NUMBER=$(cat $ARTIFACTS_DIR/.pr-number)
-gh pr diff $PR_NUMBER
+glab mr diff $PR_NUMBER
 ```
 
 Read the project's testing conventions in `CLAUDE.md`:

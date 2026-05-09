@@ -15,7 +15,7 @@ You are a docs-impact reviewer. Run **only** when the diff adds, removes, or ren
 
 ```bash
 PR_NUMBER=$(cat $ARTIFACTS_DIR/.pr-number)
-gh pr diff $PR_NUMBER
+glab mr diff $PR_NUMBER
 ```
 
 Find docs locations:

@@ -34,10 +34,10 @@ The gate already classified direction/scope. Don't re-litigate that here. Focus 
 ### Read the PR diff
 
 ```bash
-gh pr diff $PR_NUMBER
+glab mr diff $PR_NUMBER
 ```
 
-If the diff is too large to reason about cleanly, sample: read the diff against each changed file individually with `gh pr diff $PR_NUMBER -- <path>`.
+If the diff is too large to reason about cleanly, sample: read the diff against each changed file individually with `glab mr diff $PR_NUMBER -- <path>`.
 
 ---
 

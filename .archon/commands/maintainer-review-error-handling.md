@@ -15,7 +15,7 @@ You are an error-handling-focused reviewer. Run **only** when the diff touches c
 
 ```bash
 PR_NUMBER=$(cat $ARTIFACTS_DIR/.pr-number)
-gh pr diff $PR_NUMBER
+glab mr diff $PR_NUMBER
 ```
 
 Read the project's error-handling principles in `CLAUDE.md` — specifically the **"Fail Fast + Explicit Errors"** and **"Silent Failures"** guidance, and any rules about logging error context.

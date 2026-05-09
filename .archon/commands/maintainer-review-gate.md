@@ -5,7 +5,7 @@ argument-hint: (no arguments — reads upstream node outputs and writes artifact
 
 # Maintainer Review — Gate
 
-You are the **gatekeeper** for a single GitHub PR. Your job is to decide whether the PR is worth a comprehensive review or whether the maintainer should politely decline / request a split. You do **not** review code quality here — that happens downstream if you say "review."
+You are the **gatekeeper** for a single GitLab MR. Your job is to decide whether the MR is worth a comprehensive review or whether the maintainer should politely decline / request a split. You do **not** review code quality here — that happens downstream if you say "review."
 
 **Workflow ID**: $WORKFLOW_ID
 
@@ -13,9 +13,9 @@ You are the **gatekeeper** for a single GitHub PR. Your job is to decide whether
 
 ## Phase 1: LOAD INPUTS
 
-Three sources of upstream context, all gathered for you below. **You may also `cat .github/PULL_REQUEST_TEMPLATE.md` if you need to compare the PR body's structure against the project's template** — that's the one allowed extra read; everything else lives in the inputs below.
+Three sources of upstream context, all gathered for you below. **You may also `cat .gitlab/merge_request_templates/Default.md` if you need to compare the MR description's structure against the project's template** — that's the one allowed extra read; everything else lives in the inputs below.
 
-### PR data (gh pr view JSON)
+### MR data (glab mr view -F json)
 
 ```json
 $fetch-pr.output
@@ -66,17 +66,17 @@ Does the PR do **one thing**?
 To assess scope, look at:
 - Diff structure: do the changed files cluster around a single concern, or sprawl?
 - Title + body: does the contributor describe one change, or several "while I was here" changes?
-- Commit history if visible in `gh pr view`: is the PR a single coherent story, or accreted fixes?
+- Commit history if visible in `glab mr view`: is the MR a single coherent story, or accreted fixes?
 
 ### Gate C — Template quality
 
-Was `.github/PULL_REQUEST_TEMPLATE.md` filled in?
+Was `.gitlab/merge_request_templates/Default.md` filled in?
 
 - **good**: All template sections completed thoughtfully (Summary, Validation, Security, Rollback, etc.).
 - **partial**: Template structure present but several sections empty or perfunctory ("N/A", "TBD", or single-word answers where prose is expected).
 - **empty**: No template, or template skeleton with all sections blank.
 
-The PR body is in `pr_data.body`. If you need the template's expected structure for comparison, that's the one allowed extra read: `cat .github/PULL_REQUEST_TEMPLATE.md`.
+The MR description is in `pr_data.description`. If you need the template's expected structure for comparison, that's the one allowed extra read: `cat .gitlab/merge_request_templates/Default.md`.
 
 ---
 

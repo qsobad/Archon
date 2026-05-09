@@ -15,7 +15,7 @@ You are a comment / docstring reviewer. Run **only** when the diff adds or modif
 
 ```bash
 PR_NUMBER=$(cat $ARTIFACTS_DIR/.pr-number)
-gh pr diff $PR_NUMBER
+glab mr diff $PR_NUMBER
 ```
 
 Read the project's comment policy in `CLAUDE.md`:
