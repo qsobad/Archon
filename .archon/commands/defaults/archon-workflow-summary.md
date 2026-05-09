@@ -327,10 +327,10 @@ These were **intentionally excluded** from scope:
 **Artifacts**: `$ARTIFACTS_DIR/`
 ```
 
-### 4.2 Post to GitHub
+### 4.2 Post to GitLab
 
 ```bash
-gh pr comment {pr-number} --body "{formatted-summary}"
+glab mr note {pr-number} --message "{formatted-summary}"
 ```
 
 **PHASE_4_CHECKPOINT:**

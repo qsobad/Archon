@@ -258,15 +258,15 @@ If not addressing in this PR, create issues for:
 
 ## Phase 4: POST - GitHub PR Comment
 
-### 4.1 Format for GitHub
+### 4.1 Format for GitLab
 
-Create a GitHub-friendly version of the review:
+Create a GitLab-friendly version of the review:
 
 ```bash
-gh pr comment {number} --body "$(cat <<'EOF'
-# 🔍 Comprehensive PR Review
+glab mr note {number} --message "$(cat <<'EOF'
+# 🔍 Comprehensive MR Review
 
-**PR**: #{number}
+**MR**: !{number}
 **Reviewed by**: 5 specialized agents
 **Date**: {date}
 

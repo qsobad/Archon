@@ -29,22 +29,22 @@ Read the consolidated review artifact and implement all CRITICAL and HIGH priori
 
 ## Phase 1: LOAD - Get Fix List
 
-### 1.1 Get PR Number from Registry
+### 1.1 Get MR Number from Registry
 
 ```bash
-PR_NUMBER=$(cat $ARTIFACTS_DIR/.pr-number)
+MR_NUMBER=$(cat $ARTIFACTS_DIR/.pr-number)
 
-# Get the PR's head branch name
-HEAD_BRANCH=$(gh pr view $PR_NUMBER --json headRefName --jq '.headRefName')
-echo "PR: $PR_NUMBER, Branch: $HEAD_BRANCH"
+# Get the MR's source branch name
+HEAD_BRANCH=$(glab mr view $MR_NUMBER -F json | jq -r '.source_branch')
+echo "MR: $MR_NUMBER, Branch: $HEAD_BRANCH"
 ```
 
-### 1.2 Checkout the PR Branch
+### 1.2 Checkout the MR Branch
 
-**CRITICAL: Work on the PR's actual branch, not a new branch.**
+**CRITICAL: Work on the MR's actual branch, not a new branch.**
 
 ```bash
-# Fetch and checkout the PR's branch
+# Fetch and checkout the MR's branch
 git fetch origin $HEAD_BRANCH
 git checkout $HEAD_BRANCH
 git pull origin $HEAD_BRANCH
@@ -325,16 +325,16 @@ Write to `$ARTIFACTS_DIR/review/fix-report.md`:
 
 ---
 
-## Phase 6: POST - GitHub Comment
+## Phase 6: POST - GitLab Comment
 
 ### 6.1 Post Fix Report
 
 ```bash
-gh pr comment {number} --body "$(cat <<'EOF'
+glab mr note {number} --message "$(cat <<'EOF'
 # ⚡ Auto-Fix Report
 
 **Status**: {COMPLETE | PARTIAL}
-**Pushed**: ✅ Changes pushed to PR
+**Pushed**: ✅ Changes pushed to MR
 
 ---
 

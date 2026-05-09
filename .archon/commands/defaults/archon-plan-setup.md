@@ -104,10 +104,10 @@ git remote get-url origin
 
 ### 2.2 Determine Repository Info
 
-Extract owner/repo from the remote URL for PR creation:
+Extract namespace/repo from the remote URL for MR creation:
 
 ```bash
-gh repo view --json nameWithOwner -q .nameWithOwner
+glab repo view -F json | jq -r '.path_with_namespace'
 ```
 
 ### 2.3 Branch Decision
