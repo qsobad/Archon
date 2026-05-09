@@ -39,7 +39,7 @@ Note:
 ### 1.3 Get PR Diff
 
 ```bash
-gh pr diff {number}
+glab mr diff {number}
 ```
 
 ### 1.4 Read CLAUDE.md

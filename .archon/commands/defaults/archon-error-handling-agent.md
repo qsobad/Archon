@@ -34,7 +34,7 @@ cat $ARTIFACTS_DIR/review/scope.md
 ### 1.3 Get PR Diff
 
 ```bash
-gh pr diff {number}
+glab mr diff {number}
 ```
 
 ### 1.4 Read CLAUDE.md Error Handling Rules

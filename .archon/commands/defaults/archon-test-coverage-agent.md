@@ -36,7 +36,7 @@ Note which files are source vs test files.
 ### 1.3 Get PR Diff
 
 ```bash
-gh pr diff {number}
+glab mr diff {number}
 ```
 
 ### 1.4 Read Existing Tests
