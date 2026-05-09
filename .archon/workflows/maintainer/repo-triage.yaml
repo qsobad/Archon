@@ -35,7 +35,7 @@ nodes:
           templates from `.github/ISSUE_TEMPLATE/`.
 
           Fetch the issue:
-            gh issue view <N> --json number,title,body,labels,author
+            glab issue view <N> -F json
 
           Return ONLY a single JSON object — no fences, no prose:
 
@@ -64,7 +64,7 @@ nodes:
           Be terse. If the issue body is empty, set area='unknown' and
           quality='empty'.
 
-          ERROR HANDLING — if the `gh issue view` call fails (auth,
+          ERROR HANDLING — if the `glab issue view` call fails (auth,
           rate limit, network, or non-zero exit), do NOT emit JSON.
           Instead print exactly one line on stdout:
               ERROR: <one-line reason>
@@ -80,11 +80,11 @@ nodes:
           echo "DRY_RUN=${DRY_RUN:-0}"
 
       If DRY_RUN=1 — READ-ONLY mode:
-        - Do all read-only work (gh list/view/api, state file reads, clustering).
+        - Do all read-only work (glab list/view/api, state file reads, clustering).
         - For every mutation you WOULD have made (label, comment, close,
           state write), print a line prefixed `[DRY] would ...` with the
           full body you would have posted.
-        - Do NOT run `gh issue (comment|close|edit)`. Do NOT use the Write
+        - Do NOT run `glab issue (note|close|update)`. Do NOT use the Write
           tool on `.archon/state/*.json`.
         - When delegating via Task to triage-agent/brief-gen, PREPEND this
           exact sentence to every Task prompt:
@@ -123,7 +123,7 @@ nodes:
             e.g. `printf '%s\n%s\n%s' "$T" "$B" "$U" | shasum | cut -c1-12`.
       - `pendingDedupComments[<issueNumber>]`: { canonical, botCommentId, postedAt }
           - `postedAt`: ISO-8601 UTC (`date -u +%FT%TZ`).
-          - `botCommentId`: the comment ID from `gh issue comment` — if you
+          - `botCommentId`: the comment ID from `glab issue note` — if you
             can't parse one, keep the full returned URL.
 
       # Step-by-step
@@ -146,11 +146,11 @@ nodes:
 
       ## 2. Fetch all open issues
       ```
-      gh issue list --state open \
-        --json number,title,body,author,labels,comments,createdAt,updatedAt \
-        --limit 200 > "$ARTIFACTS_DIR/issues.json"
+      glab issue list \
+        -F json \
+        -P 100 > "$ARTIFACTS_DIR/issues.json"
       ```
-      (`gh issue list` already excludes PRs.)
+      (`glab issue list` already excludes PRs.)
 
       Also read issue templates ONCE at this point for the template-
       adherence check downstream:
@@ -185,8 +185,8 @@ nodes:
       for speed). Per-task prompt:
 
           "Triage open issue #<N> in this repository. Fetch it via
-           `gh issue view`, classify by type/effort/priority/area, and
-           apply the missing label categories via `gh issue edit`.
+           `glab issue view`, classify by type/effort/priority/area, and
+           apply the missing label categories via `glab issue update`.
            Respect existing labels."
 
       Wait for all label tasks to settle before moving on.
@@ -206,7 +206,7 @@ nodes:
       block — brief-gen will return `quality: "no-template-context"`.
 
       Parse each response as JSON. On parse failure OR when the response
-      starts with `ERROR:` (sub-agent signalling a gh/auth/rate-limit
+      starts with `ERROR:` (sub-agent signalling a glab/auth/rate-limit
       problem — see brief-gen prompt):
         - Log the failed issue number and the first 200 chars of the
           raw response.
@@ -241,7 +241,7 @@ nodes:
               Could you confirm whether it's a duplicate? If there is no
               reply within 3 days this issue will be auto-closed.
 
-          Via: `gh issue comment <N> --body "..."` — capture the comment ID.
+          Via: `glab issue note <N> --message "..."` — capture the comment ID.
         - Record in state:
               pendingDedupComments[N] = {
                 canonical: C,
@@ -254,10 +254,10 @@ nodes:
 
       ## 8. RECONCILE PASS — 3-day auto-close
       Cache the bot's GitHub login once at the top of the run:
-          gh api user --jq .login
+          glab api user --jq .login
 
       For each entry `(N, { canonical, botCommentId, postedAt })`:
-        - Fetch current comments: `gh issue view <N> --json comments`
+        - Fetch current comments: `glab issue view <N> -F json`
         - Identify comments created AFTER `postedAt` whose author is NOT
           the cached bot login.
         - If ANY non-bot reply after `postedAt` → drop entry from state
@@ -270,7 +270,7 @@ nodes:
             - Post closing comment on #N:
                   "Auto-closing: no reply within 3 days of the duplicate
                    check. Please reopen if this is still relevant."
-            - `gh issue close <N> --reason "not planned"` — capture
+            - `glab issue close <N>  # NOTE: GitLab has no --reason equivalent (was: "not planned")` — capture
               exit code. If non-zero (network, rate limit, issue
               already-closed-elsewhere), DO NOT drop state: set
               `closeAttemptFailed: true` on the entry for retry next
@@ -304,7 +304,7 @@ nodes:
       - NEVER close an issue that is not tracked in `pendingDedupComments`
         with `postedAt` ≥ 3 days ago AND no reply after that timestamp.
       - NEVER label issues yourself — always delegate to `triage-agent`.
-      - If `gh` returns an auth error or rate limit, stop the run cleanly
+      - If `glab` returns an auth error or rate limit, stop the run cleanly
         and report in the summary. Do NOT partially mutate state.
       - State writes are ATOMIC per run — only write the final merged
         state once at step 9. If a pass fails midway, the previous state
@@ -335,7 +335,7 @@ nodes:
           be given an issue number in the caller's prompt.
 
           Fetch the issue with:
-            gh issue view <N> --json number,title,body,stateReason,closedAt,comments,labels
+            glab issue view <N> -F json
 
           Also check the closing comment thread for any `#<pr>` reference
           that looks like it closed the issue (keywords: closed by, fixed by,
@@ -349,7 +349,7 @@ nodes:
             "primarySymptom": "one short sentence — the core symptom",
             "area": "single best-guess area tag (same vocabulary as open briefs)",
             "closedAt": "<ISO timestamp>",
-            "stateReason": "completed | not_planned | duplicate | null (normalize gh CLI's UPPERCASE output to lowercase)",
+            "state": "opened | closed (GitLab does not expose a closure-reason field — use null when not applicable)",
             "resolvedByPr": "<PR number if identifiable from closing thread, else null>"
           }
 
@@ -357,7 +357,7 @@ nodes:
           `not_planned` or `duplicate`, that matters for the match
           verdict downstream — include it honestly.
 
-          ERROR HANDLING — if `gh issue view` fails, print exactly:
+          ERROR HANDLING — if `glab issue view` fails, print exactly:
               ERROR: <one-line reason>
           on a single stdout line. Do NOT emit partial/fabricated JSON.
     prompt: |
@@ -372,15 +372,15 @@ nodes:
 
       If SKIP_CLOSED_DEDUP=1 — print
           "Skipping closed-dedup-check per SKIP_CLOSED_DEDUP=1"
-      and exit immediately. No gh calls, no state read, no Task fan-out.
+      and exit immediately. No glab calls, no state read, no Task fan-out.
 
       If DRY_RUN=1 — READ-ONLY:
-        - Do read-only work (gh list/view, state reads, clustering).
+        - Do read-only work (glab list/view, state reads, clustering).
         - For every mutation (comment, close, state write), print `[DRY] would ...`.
-        - Do NOT run gh issue comment/close.
+        - Do NOT run glab issue note/close.
         - Do NOT use Write on `.archon/state/*.json`.
         - When spawning closed-brief-gen via Task, prepend to its prompt:
-              "DRY_RUN=1 is active. Run only read-only gh commands."
+              "DRY_RUN=1 is active. Run only read-only glab commands."
         - End with a summary prefixed `## (DRY RUN) Closed-dedup check — <now>`.
 
       # Context artifact from triage-issues
@@ -445,15 +445,14 @@ nodes:
           CUTOFF=$(date -u -v-90d +%Y-%m-%d 2>/dev/null || date -u -d '90 days ago' +%Y-%m-%d)
 
       Fetch:
-          gh issue list --state closed --limit 200 \
-            --json number,title,body,labels,stateReason,closedAt \
+          glab issue list --closed -P 100 \
+            -F json \
             --search "closed:>${CUTOFF}" > "$ARTIFACTS_DIR/closed-issues.json"
 
-      Filter out any closed issue whose `stateReason` (case-insensitive) matches `duplicate`
-      — those are noise for our matching (they were already dedup'd against canonical).
-      Note: `gh issue view --json stateReason` returns UPPERCASE (`COMPLETED`, `NOT_PLANNED`,
-      `DUPLICATE`), while the `gh issue close --reason` flag wants lowercase with a space
-      (`"completed"`, `"not planned"`). Lowercase-compare downstream.
+      GitLab does not expose a per-issue closure-reason field. Treat any closed
+      issue uniformly here; if you need to detect duplicates, scan the issue
+      description / linked-issue metadata or rely on labels (e.g. `duplicate`)
+      that the maintainer applied at close time.
 
       ## 3. Classify work
       For each closed issue:
@@ -490,7 +489,7 @@ nodes:
       For each NEW candidate (open #O → closed #C):
 
         - Fetch the reporter's login (not stored in briefs):
-              gh issue view <O> --json author --jq .author.login
+              glab issue view <O> -F json --jq .author.username
 
         - Build the comment body (tag the reporter):
 
@@ -500,7 +499,7 @@ nodes:
               your case? If there is no reply within 3 days this issue will
               be auto-closed.
 
-        - Post: `gh issue comment <O> --body "..."`
+        - Post: `glab issue note <O> --message "..."`
           Capture comment ID.
         - Record in state:
               closedMatchComments[O] = {
@@ -512,11 +511,11 @@ nodes:
       Post sequentially (not via Task) so you can capture comment IDs.
 
       ## 7. RECONCILE PASS — 3-day auto-close
-      Cache bot login once at top-of-run: `gh api user --jq .login`.
+      Cache bot login once at top-of-run: `glab api user --jq .login`.
 
       For each entry `(O, { matchedClosed, botCommentId, postedAt })` in
       `state.closedMatchComments`:
-        - Fetch: `gh issue view <O> --json comments`
+        - Fetch: `glab issue view <O> -F json`
         - Find comments AFTER `postedAt` whose author is NOT the bot.
         - If reporter replied → drop entry (engaged).
         - VALIDATE `postedAt` parses as ISO-8601 first. If not: log and
@@ -526,7 +525,7 @@ nodes:
                   "Auto-closing: no reply within 3 days of the closed-match
                    check. Please reopen if your case is NOT resolved by
                    #<matchedClosed>."
-            - `gh issue close <O> --reason "not planned"` — capture exit
+            - `glab issue close <O>  # NOTE: GitLab has no --reason equivalent (was: "not planned")` — capture exit
               code. On non-zero: set `closeAttemptFailed: true` on the
               entry for retry, log the failure, do NOT drop state.
             - Only drop entry on exit 0.
@@ -554,7 +553,7 @@ nodes:
       - Be MORE conservative here than triage-issues — false positives
         suggest a reporter's bug is already fixed when it isn't, and that
         erodes trust. When in doubt, skip.
-      - If `gh` errors (auth, rate limit), abort cleanly and summarise.
+      - If `glab` errors (auth, rate limit), abort cleanly and summarise.
       - State writes are ATOMIC — one Write at step 8.
       - Parallel Task fan-out required for step 4 only. Step 6 is sequential
         to capture comment IDs reliably.
@@ -581,8 +580,8 @@ nodes:
           and a `state` hint (open/closed) in the caller's prompt.
 
           Fetch:
-            gh pr view <N> --json number,title,body,state,headRefName,changedFiles,additions,deletions,mergedAt,closedAt,stateReason
-            gh pr diff <N> --color=never | head -c 30000
+            glab mr view <N> -F json
+            glab mr diff <N> --color=never | head -c 30000
 
           Return ONLY a single JSON object — no fences, no prose:
 
@@ -603,11 +602,11 @@ nodes:
           the only information available.
 
           If the diff was truncated (you hit the 30,000-char limit when
-          reading `gh pr diff`), set `diffTruncated: true` on the brief
+          reading `glab mr diff`), set `diffTruncated: true` on the brief
           output so the orchestrator knows to be more conservative about
           `fully-addresses` claims.
 
-          ERROR HANDLING — if `gh pr view` or `gh pr diff` fails, print:
+          ERROR HANDLING — if `glab mr view` or `glab mr diff` fails, print:
               ERROR: <one-line reason>
           on a single stdout line. Do NOT emit partial/fabricated JSON.
     prompt: |
@@ -625,11 +624,11 @@ nodes:
       and exit immediately.
 
       If DRY_RUN=1 — READ-ONLY:
-        - All read-only gh calls OK.
-        - Do NOT run `gh pr comment`. Do NOT use Write on state files.
+        - All read-only glab calls OK.
+        - Do NOT run `glab mr note create`. Do NOT use Write on state files.
         - Print `[DRY] would ...` for every mutation.
         - When spawning pr-brief-gen via Task, prepend:
-              "DRY_RUN=1 is active. Run only read-only gh commands."
+              "DRY_RUN=1 is active. Run only read-only glab commands."
         - End with a summary prefixed `## (DRY RUN) Closed-PR dedup — <now>`.
 
       # State file
@@ -667,17 +666,17 @@ nodes:
           CUTOFF=$(date -u -v-90d +%Y-%m-%d 2>/dev/null || date -u -d '90 days ago' +%Y-%m-%d)
 
       ```
-      gh pr list --state open --limit 100 \
-        --json number,title,body,headRefName,updatedAt,author \
+      glab mr list -P 100 \
+        -F json \
         > "$ARTIFACTS_DIR/open-prs.json"
 
-      gh pr list --state closed --limit 200 \
-        --json number,title,body,state,closedAt,mergedAt \
+      glab mr list --closed -P 100 \
+        -F json \
         --search "closed:>${CUTOFF}" \
         > "$ARTIFACTS_DIR/closed-prs.json"
       ```
 
-      (`--state closed` includes both merged and non-merged closed PRs.)
+      (`--closed` includes both merged and non-merged closed PRs.)
 
       ## 3. Classify work
       For both open and closed PRs:
@@ -730,13 +729,13 @@ nodes:
                  closed on <date> (<stateReason>). You may want to read
                  the discussion there before pushing further."
 
-        - Idempotency: fetch `gh pr view <O> --json comments`. If the
+        - Idempotency: fetch `glab mr view <O> -F json`. If the
           fetch fails (non-zero exit), SKIP POSTING and log the error —
           never fall through to post-anyway (that would double-post on
-          every gh hiccup). Only when the fetch succeeds AND no existing
+          every glab hiccup). Only when the fetch succeeds AND no existing
           comment has the same body do we proceed.
 
-        - Post: `gh pr comment <O> --body "..."`. Capture comment ID.
+        - Post: `glab mr note create <O> --message "..."`. Capture comment ID.
 
         - Record in state:
               closedMatchComments[O] = {
@@ -801,9 +800,9 @@ nodes:
 
           Your work:
             1. Fetch the PR:
-                 gh pr view <N> --json number,title,body,files,headRefName
+                 glab mr view <N> -F json
             2. Fetch a compact diff:
-                 gh pr diff <N> --color=never | head -c 60000
+                 glab mr diff <N> --color=never | head -c 60000
             3. For each open issue, decide:
                - `fully-addresses`: PR's scope CLEARLY covers EVERY symptom
                  in the issue. Err strictly toward "related" if unsure.
@@ -846,7 +845,7 @@ nodes:
           Default bias: when the PR description doesn't explicitly claim
           to close the issue, mark it `related`, never `fully-addresses`.
 
-          ERROR HANDLING — if `gh pr view` or `gh pr diff` fails, print:
+          ERROR HANDLING — if `glab mr view` or `glab mr diff` fails, print:
               ERROR: <one-line reason>
           on a single stdout line. Do NOT emit partial/fabricated JSON.
     prompt: |
@@ -859,22 +858,22 @@ nodes:
           echo "DRY_RUN=${DRY_RUN:-0} SKIP_PR_LINK=${SKIP_PR_LINK:-0}"
 
       If SKIP_PR_LINK=1 — print exactly:
-          "Skipping link-prs per SKIP_PR_LINK=1 — no state read, no gh
+          "Skipping link-prs per SKIP_PR_LINK=1 — no state read, no glab
            calls, no comments."
-      and exit immediately. Do not read state, do not call gh, do not
+      and exit immediately. Do not read state, do not call glab, do not
       use Task. This is the "staged rollout" escape hatch for the first
       live run of the full workflow.
 
       If DRY_RUN=1 — READ-ONLY mode:
-        - Do all read-only work (gh list/view/diff, state reads, matching).
+        - Do all read-only work (glab list/view/diff, state reads, matching).
         - For every mutation you WOULD have made (PR/issue comment, state
           write), print a line prefixed `[DRY] would ...` with the full
           body you would have posted on which target.
-        - Do NOT run `gh issue comment` or `gh pr comment`. Do NOT use
+        - Do NOT run `glab issue note` or `glab mr note create`. Do NOT use
           the Write tool on `.archon/state/*.json`.
         - When delegating via Task to pr-issue-matcher, PREPEND this exact
           sentence to every Task prompt:
-              "DRY_RUN=1 is active. Run only read-only gh commands."
+              "DRY_RUN=1 is active. Run only read-only glab commands."
           (pr-issue-matcher is already read-only, so this is belt-and-braces.)
         - End with the standard summary table, but prefix the title
           `## (DRY RUN) PR-issue linker — <now>`.
@@ -932,13 +931,13 @@ nodes:
 
       ## 2. Fetch
       ```
-      gh pr list --state open \
-        --json number,title,body,headRefName,author,updatedAt \
-        --limit 100 > "$ARTIFACTS_DIR/prs.json"
+      glab mr list \
+        -F json \
+        -P 100 > "$ARTIFACTS_DIR/prs.json"
 
-      gh issue list --state open \
-        --json number,title,body,labels,author \
-        --limit 200 > "$ARTIFACTS_DIR/issues.json"
+      glab issue list \
+        -F json \
+        -P 100 > "$ARTIFACTS_DIR/issues.json"
       ```
 
       Also read the PR template ONCE for the template-adherence check:
@@ -982,9 +981,9 @@ nodes:
       ## 5. VERIFY PASS — confirm any "fully-addresses"
       Haiku is optimistic; Sonnet (you) owns the final judgment. For each
       candidate tagged `fully-addresses`:
-        - Read issue body fully: `gh issue view <issue> --json body,title,labels`
-        - Read PR body + diff:   `gh pr view <pr> --json body,title`
-                                 `gh pr diff <pr> --color=never`
+        - Read issue body fully: `glab issue view <issue> -F json`
+        - Read PR body + diff:   `glab mr view <pr> -F json`
+                                 `glab mr diff <pr> --color=never`
         - Decide: does the PR's change set plausibly resolve EVERY
           symptom/ask in the issue body? If ANY part is out of scope,
           ambiguous, or only partially addressed → DOWNGRADE to `related`.
@@ -999,8 +998,8 @@ nodes:
 
       ## 6. ACT PASS — comment + record
       Before posting ANY comment, check idempotency: fetch existing
-      comments on the target (`gh pr view <pr> --json comments` /
-      `gh issue view <issue> --json comments`) and skip if a comment with
+      comments on the target (`glab mr view <pr> -F json` /
+      `glab issue view <issue> -F json`) and skip if a comment with
       the same body already exists.
 
       For each PR's confirmed candidates:
@@ -1014,7 +1013,7 @@ nodes:
                    Consider adding `Closes #<issue>` to the PR body so
                    the issue auto-closes on merge."
 
-              Capture the returned comment ID from the `gh pr comment`
+              Capture the returned comment ID from the `glab mr note create`
               URL (the number after `#issuecomment-`) and record it:
                   state.linkedPrs[<pr>].commentIds.fullyAddresses[<issue>] = "<id>"
 
@@ -1085,10 +1084,10 @@ nodes:
               If a section genuinely doesn't apply, just write "N/A" in
               it rather than leaving it blank.
 
-        - Idempotency: `gh pr view <pr> --json comments` — skip if an
+        - Idempotency: `glab mr view <pr> -F json` — skip if an
           existing comment already mentions "pull_request_template.md"
           or starts with the exact greeting.
-        - Post: `gh pr comment <pr> --body "..."`. Capture the comment ID
+        - Post: `glab mr note create <pr> --message "..."`. Capture the comment ID
           from the returned URL.
         - Record in state:
               state.linkedPrs[<pr>].templateNudgedAt = "<now-iso>"
@@ -1139,7 +1138,7 @@ nodes:
         comment. Maintainers decide.
       - Default to `related`. Only suggest `fully-addresses` when the
         evidence is overwhelming.
-      - If `gh` errors out (auth, rate limit), abort cleanly and summarise.
+      - If `glab` errors out (auth, rate limit), abort cleanly and summarise.
       - State writes are ATOMIC per run — a single Write at step 7.
       - Parallel Task fan-out is required for the match pass only. Act
         pass is sequential for idempotent comment-ID capture.
@@ -1169,7 +1168,7 @@ nodes:
       and exit immediately.
 
       If DRY_RUN=1 — READ-ONLY. Print `[DRY] would ...` for each would-be
-      comment. Do NOT run `gh issue comment` / `gh pr comment`. Do NOT
+      comment. Do NOT run `glab issue note` / `glab mr note create`. Do NOT
       use Write on the state file. End with summary prefixed `## (DRY RUN)`.
 
       # State file
@@ -1207,13 +1206,13 @@ nodes:
           CUTOFF=$(date -u -v-${DAYS}d +%Y-%m-%d 2>/dev/null || date -u -d "${DAYS} days ago" +%Y-%m-%d)
 
       Stale open issues:
-          gh issue list --state open --limit 200 \
-            --json number,title,author,updatedAt,labels \
+          glab issue list -P 100 \
+            -F json \
             --search "updated:<${CUTOFF}" > "$ARTIFACTS_DIR/stale-issues.json"
 
       Stale open PRs (skip drafts):
-          gh pr list --state open --limit 100 \
-            --json number,title,author,updatedAt,isDraft \
+          glab mr list -P 100 \
+            -F json \
             --search "updated:<${CUTOFF}" > "$ARTIFACTS_DIR/stale-prs.json"
 
       ## 3. Filter
@@ -1241,13 +1240,13 @@ nodes:
             active? Happy to help unblock if review feedback or a rebase
             is needed — just drop a note.
 
-      Idempotency: `gh {issue,pr} view <N> --json comments` — skip if any
+      Idempotency: `glab {issue,mr} view <N> -F json` — skip if any
       existing comment CONTAINS the substring "has been quiet for" (a
       prefix check fails because the posted body starts with `@<author>`,
       not the phrase). If the fetch itself fails, SKIP POSTING rather
       than fall through to post-anyway.
 
-      Post: `gh issue comment <N> --body "..."` / `gh pr comment <N> --body "..."`.
+      Post: `glab issue note <N> --message "..."` / `glab mr note create <N> --message "..."`.
       Capture the comment ID from the returned URL (the number after
       `#issuecomment-`).
       Record: `state.nudged["<type>/<N>"] = {
@@ -1276,13 +1275,13 @@ nodes:
         pinned, keep-open. (Add more via PR if missed.)
       - One nudge per quiet period. Re-nudge only if the item was updated
         after the prior nudge AND went quiet again.
-      - If `gh` errors out, abort cleanly. State stays atomic.
+      - If `glab` errors out, abort cleanly. State stays atomic.
 
   # ---------------------------------------------------------------------------
   # Digest — runs LAST, after every other node. Reads each prior node's
   # final assistant output via $<nodeId>.output and synthesises one
   # maintainer-facing report to $ARTIFACTS_DIR/digest.md. Pure synthesis —
-  # no gh calls, no mutations, no Task fan-out.
+  # no glab calls, no mutations, no Task fan-out.
   # ---------------------------------------------------------------------------
   - id: digest
     depends_on:
@@ -1323,7 +1322,7 @@ nodes:
       Steps:
 
       1. Determine the repo slug:
-             SLUG=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
+             SLUG=$(glab repo view -F json --jq .nameWithOwner)
          (example: `coleam00/Archon`)
 
       2. URL shape:
@@ -1579,7 +1578,7 @@ nodes:
 
       # Guardrails
 
-      - No gh calls here. No comments. No closes. Synthesis only.
+      - No glab calls here. No comments. No closes. Synthesis only.
       - If any prior node's output is missing or mangled, note it in the
         corresponding section: "(output unavailable)". Don't invent numbers.
       - Preserve `(DRY RUN)` markers — readers need to know if counts are
