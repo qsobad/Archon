@@ -546,28 +546,28 @@ nodes:
       ver=$bump-version.output.newVersion
       body=$format-changelog.output.rendered
 
-      # If a PR already exists for this branch, just print its URL.
-      existing=$(gh pr list --head dev --base main --state open --json url --jq '.[0].url' 2>/dev/null || true)
+      # If an MR already exists for this branch, just print its URL.
+      existing=$(glab mr list --source-branch dev --target-branch main -F json 2>/dev/null | jq -r '.[0].web_url // empty' || true)
       if [ -n "$existing" ]; then
-        echo "PR already open: $existing"
+        echo "MR already open: $existing"
         echo "$existing"
         exit 0
       fi
 
-      # Build the PR body in a way that doesn't put a literal "---" at YAML column 1
-      pr_body=$(printf '%s\n\n---\n\nMerging this PR releases %s to main.\n' "$body" "$ver")
+      # Build the MR description in a way that doesn't put a literal "---" at YAML column 1
+      pr_body=$(printf '%s\n\n---\n\nMerging this MR releases %s to main.\n' "$body" "$ver")
 
-      url=$(gh pr create --base main --head dev --title "Release $ver" --body "$pr_body")
-      echo "$url"
+      glab mr create --target-branch main --source-branch dev --title "Release $ver" --description "$pr_body" --yes >/dev/null
+      glab mr view -F json | jq -r '.web_url'
     timeout: 60000
     depends_on: [commit-and-push, format-changelog, bump-version]
     when: "$parse-args.output.dryRun == 'false'"
 
   # ═══════════════════════════════════════════════════════════════════
-  # PHASE 7 — Wait for the PR to merge (skipped in --dry-run)
+  # PHASE 7 — Wait for the MR to merge (skipped in --dry-run)
   # ───────────────────────────────────────────────────────────────────
-  # The user (or a reviewer) merges the PR however they prefer:
-  #   gh pr merge --squash --delete-branch=false
+  # The user (or a reviewer) merges the MR however they prefer:
+  #   glab mr merge --squash
   # then approves here. We don't auto-merge — keeps reviewer in control.
   # ═══════════════════════════════════════════════════════════════════
 
@@ -577,16 +577,16 @@ nodes:
       Reply to the user with EXACTLY this text, verbatim, no elaboration:
 
       ══════════════════════════════════════════════════════════════════
-      PR OPENED — waiting for merge
+      MR OPENED — waiting for merge
       ══════════════════════════════════════════════════════════════════
 
       $create-pr.output
 
-      Merge the PR however you prefer:
-        gh pr merge --squash --delete-branch=false
-        (or use the GitHub web UI)
+      Merge the MR however you prefer:
+        glab mr merge --squash
+        (or use the GitLab web UI)
 
-      Then approve here to continue with tag, GitHub release, dev sync,
+      Then approve here to continue with tag, GitLab release, dev sync,
       binary wait, and Homebrew formula update.
     depends_on: [create-pr]
     model: haiku
@@ -596,13 +596,13 @@ nodes:
   - id: wait-for-merge
     approval:
       message: |
-        Approve once the PR above has been merged into main.
-        Reject to stop — the PR will remain open and reviewable.
+        Approve once the MR above has been merged into main.
+        Reject to stop — the MR will remain open and reviewable.
     depends_on: [merge-summary]
     when: "$parse-args.output.dryRun == 'false'"
 
   # ═══════════════════════════════════════════════════════════════════
-  # PHASE 8 — Tag, GitHub release, sync dev with main
+  # PHASE 8 — Tag, GitLab release, sync dev with main
   # ═══════════════════════════════════════════════════════════════════
 
   - id: tag-and-release
@@ -621,7 +621,7 @@ nodes:
       # Strip the leading "## [x.y.z] - YYYY-MM-DD" header line for the release body.
       notes=$(printf '%s\n' "$body" | sed '1{/^## /d;}; 2{/^$/d;}')
 
-      gh release create "v$ver" --title "v$ver" --notes "$notes"
+      glab release create "v$ver" --name "v$ver" --notes "$notes"
 
       echo "Tagged and released v$ver"
     timeout: 90000
@@ -665,22 +665,24 @@ nodes:
       set -uo pipefail
 
       ver=$bump-version.output.newVersion
-      repo=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+      repo=$(glab repo view -F json | jq -r '.path_with_namespace')
 
-      echo "Waiting for release workflow to finish uploading binaries to v$ver..."
+      echo "Waiting for release pipeline to finish uploading binaries to v$ver..."
 
       for i in $(seq 1 30); do
-        asset_count=$(gh release view "v$ver" --repo "$repo" --json assets --jq '.assets | length' 2>/dev/null || echo "0")
+        asset_count=$(glab release view "v$ver" --repo "$repo" -F json 2>/dev/null | jq '.assets.links | length' || echo "0")
 
         if [ "$asset_count" -ge 7 ]; then
           echo "All $asset_count assets uploaded"
           exit 0
         fi
 
-        # Short-circuit: if the release workflow itself failed, stop waiting.
-        workflow_status=$(gh run list --workflow release.yml --event push --limit 1 --json conclusion,status --jq '.[0] | "\(.status)|\(.conclusion)"' 2>/dev/null || echo "unknown|unknown")
-        if [ "$workflow_status" = "completed|failure" ]; then
-          echo "Release workflow FAILED — see: gh run view --log-failed"
+        # Short-circuit: if the latest pipeline on the v$ver tag failed, stop waiting.
+        # GitLab CI pipelines replace GitHub Actions workflow runs here; states are
+        # success / failed / canceled / running / pending / skipped / created / etc.
+        pipeline_status=$(glab ci list --branch "v$ver" -F json -P 1 2>/dev/null | jq -r '.[0].status // "unknown"')
+        if [ "$pipeline_status" = "failed" ] || [ "$pipeline_status" = "canceled" ]; then
+          echo "Release pipeline FAILED ($pipeline_status) — inspect with: glab ci get --branch v$ver"
           exit 1
         fi
 
