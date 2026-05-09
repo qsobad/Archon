@@ -126,12 +126,12 @@ Format the review as a GitHub-friendly comment:
 
 ---
 
-## Phase 3: POST - Comment on PR
+## Phase 3: POST - Comment on MR
 
 ### 3.1 Post the Comment
 
 ```bash
-gh pr comment {PR_NUMBER} --body "$(cat <<'EOF'
+glab mr note create {PR_NUMBER} --message "$(cat <<'EOF'
 {formatted comment body}
 EOF
 )"
@@ -140,12 +140,12 @@ EOF
 ### 3.2 Verify
 
 ```bash
-# Check the comment was posted
-gh pr view {PR_NUMBER} --comments --json comments --jq '.comments | length'
+# Check the note was posted
+glab mr note list {PR_NUMBER} -F json | jq 'length'
 ```
 
 **PHASE_3_CHECKPOINT:**
-- [ ] Comment posted to PR
+- [ ] Comment posted to MR
 - [ ] Verified comment exists
 
 ---

@@ -330,7 +330,7 @@ Write to `$ARTIFACTS_DIR/review/fix-report.md`:
 ### 6.1 Post Fix Report
 
 ```bash
-glab mr note {number} --message "$(cat <<'EOF'
+glab mr note create {number} --message "$(cat <<'EOF'
 # ⚡ Auto-Fix Report
 
 **Status**: {COMPLETE | PARTIAL}

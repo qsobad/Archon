@@ -219,17 +219,17 @@ Write to `$ARTIFACTS_DIR/completion-report.md`:
 
 ---
 
-## Phase 4: POST — GitHub Issue Comment
+## Phase 4: POST — GitLab Issue Comment
 
-Post to the original GitHub issue:
+Post to the original GitLab issue:
 
 ```bash
 ISSUE_NUMBER=$(echo "$ARGUMENTS" | grep -oE '[0-9]+')
 
-gh issue comment $ISSUE_NUMBER --body "$(cat <<'EOF'
+glab issue note $ISSUE_NUMBER --message "$(cat <<'EOF'
 ## ✅ Issue Resolution Report
 
-**PR**: #{pr-number} ({pr-url})
+**MR**: !{pr-number} ({pr-url})
 **Status**: COMPLETE
 
 ---

@@ -24,10 +24,11 @@ Search the web for information relevant to the issue or feature being worked on.
 
 ### 1.1 Get Issue Context
 
-If input looks like a GitHub issue number:
+If input looks like a GitLab issue number:
 
 ```bash
-gh issue view $ARGUMENTS --json title,body,labels
+glab issue view $ARGUMENTS -F json
+# Use .title, .description, .labels
 ```
 
 ### 1.2 Identify Research Targets

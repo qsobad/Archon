@@ -263,7 +263,7 @@ If not addressing in this PR, create issues for:
 Create a GitLab-friendly version of the review:
 
 ```bash
-glab mr note {number} --message "$(cat <<'EOF'
+glab mr note create {number} --message "$(cat <<'EOF'
 # 🔍 Comprehensive MR Review
 
 **MR**: !{number}

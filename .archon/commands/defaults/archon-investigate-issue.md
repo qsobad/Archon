@@ -27,18 +27,20 @@ Investigate the issue/problem and produce a comprehensive implementation plan th
 
 **Check the input format:**
 
-- Looks like a number (`123`, `#123`) → GitHub issue number
-- Starts with `http` → GitHub URL (extract issue number)
+- Looks like a number (`123`, `#123`) → GitLab issue number
+- Starts with `http` → GitLab URL (extract issue number)
 - Anything else → Free-form description
 
 ```bash
-# If GitHub issue, fetch it:
-gh issue view {number} --json title,body,labels,comments,state,url,author
+# If GitLab issue, fetch it:
+glab issue view {number} -F json
+# Returns iid, title, description, labels, state, web_url, author.username;
+# for comments use: glab issue note list {number} -F json
 ```
 
 ### 1.2 Extract Context
 
-**If GitHub issue:**
+**If GitLab issue:**
 - Title: What's the reported problem?
 - Body: Details, reproduction steps, expected vs actual
 - Labels: bug? enhancement? documentation?
@@ -426,14 +428,14 @@ bun run lint
 
 ---
 
-## Phase 5: POST - GitHub Comment
+## Phase 5: POST - GitLab Comment
 
-**Only if input was a GitHub issue (not free-form):**
+**Only if input was a GitLab issue (not free-form):**
 
-Format the artifact for GitHub and post:
+Format the artifact for GitLab and post:
 
 ```bash
-gh issue comment {number} --body "$(cat <<'EOF'
+glab issue note {number} --message "$(cat <<'EOF'
 ## 🔍 Investigation: {Title}
 
 **Type**: `{TYPE}`

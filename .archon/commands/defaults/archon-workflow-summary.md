@@ -330,7 +330,7 @@ These were **intentionally excluded** from scope:
 ### 4.2 Post to GitLab
 
 ```bash
-glab mr note {pr-number} --message "{formatted-summary}"
+glab mr note create {pr-number} --message "{formatted-summary}"
 ```
 
 **PHASE_4_CHECKPOINT:**

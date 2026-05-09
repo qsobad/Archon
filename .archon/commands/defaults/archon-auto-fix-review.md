@@ -33,8 +33,8 @@ Read all review artifacts produced in this workflow run and fix everything surfa
 
 ```bash
 PR_NUMBER=$(cat $ARTIFACTS_DIR/.pr-number)
-HEAD_BRANCH=$(gh pr view $PR_NUMBER --json headRefName --jq '.headRefName')
-echo "PR: $PR_NUMBER, Branch: $HEAD_BRANCH"
+HEAD_BRANCH=$(glab mr view $PR_NUMBER -F json | jq -r '.source_branch')
+echo "MR: $PR_NUMBER, Branch: $HEAD_BRANCH"
 ```
 
 ### 1.2 Checkout PR Branch
@@ -261,12 +261,12 @@ Write to `$ARTIFACTS_DIR/review/fix-report.md`:
 
 ---
 
-## Phase 7: POST — GitHub Comment
+## Phase 7: POST — GitLab Comment
 
-Post the fix report as a PR comment:
+Post the fix report as an MR note:
 
 ```bash
-gh pr comment $PR_NUMBER --body "$(cat <<'EOF'
+glab mr note create $PR_NUMBER --message "$(cat <<'EOF'
 ## ⚡ Auto-Fix Report
 
 **Status**: {COMPLETE | PARTIAL}
