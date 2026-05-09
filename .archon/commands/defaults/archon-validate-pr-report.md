@@ -34,7 +34,10 @@ Also read the PR details:
 
 ```bash
 PR_NUMBER=$(cat $ARTIFACTS_DIR/.pr-number | tr -d '\n')
-gh pr view "$PR_NUMBER" --json title,body,url,headRefName,baseRefName,additions,deletions,changedFiles
+glab mr view "$PR_NUMBER" -F json
+# Use .title, .description, .web_url, .source_branch, .target_branch.
+# additions/deletions/changedFiles are not exposed by glab mr view —
+# derive from git: git diff --shortstat "origin/$(jq -r .target_branch)...origin/$(jq -r .source_branch)".
 ```
 
 List all screenshots taken:
@@ -179,15 +182,15 @@ _E2E testing was skipped — this PR's changes are not UI-visible. Validation ba
 {Final paragraph: clear recommendation with reasoning. If REQUEST_CHANGES, list the specific changes needed. If NEEDS_DISCUSSION, describe what needs to be discussed.}
 ```
 
-### 3.1 Post Summary to PR (optional)
+### 3.1 Post Summary to MR (optional)
 
-If the verdict is clear, post a condensed summary to the PR as a comment:
+If the verdict is clear, post a condensed summary to the MR as a note:
 
 ```bash
 PR_NUMBER=$(cat $ARTIFACTS_DIR/.pr-number | tr -d '\n')
 
-# Create a concise PR comment
-gh pr comment "$PR_NUMBER" --body "$(cat <<'COMMENT'
+# Create a concise MR note
+glab mr note create "$PR_NUMBER" --message "$(cat <<'COMMENT'
 ## Archon PR Validation Report
 
 **Verdict**: {APPROVE / REQUEST_CHANGES}

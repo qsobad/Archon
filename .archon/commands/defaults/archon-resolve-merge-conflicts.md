@@ -20,31 +20,32 @@ Analyze merge conflicts in the PR, automatically resolve simple conflicts where 
 ### 1.1 Parse Input
 
 **Check input format:**
-- Number (`123`, `#123`) → GitHub PR number
-- URL (`https://github.com/...`) → Extract PR number
-- Empty → Check current branch for open PR
+- Number (`123`, `#123`) → GitLab MR iid
+- URL (`https://gitlab.com/...`) → Extract MR iid
+- Empty → Check current branch for open MR
 
 ```bash
-gh pr view {number} --json number,title,headRefName,baseRefName,mergeable,mergeStateStatus
+glab mr view {number} -F json
+# Use .iid, .title, .source_branch, .target_branch, .merge_status
 ```
 
 ### 1.2 Verify Conflicts Exist
 
 ```bash
-gh pr view {number} --json mergeable,mergeStateStatus --jq '.mergeable, .mergeStateStatus'
+glab mr view {number} -F json | jq -r '.merge_status'
 ```
 
 | Status | Action |
 |--------|--------|
-| `CONFLICTING` | Continue with resolution |
-| `MERGEABLE` | Report "No conflicts to resolve" and exit |
-| `UNKNOWN` | Wait and retry, or proceed with caution |
+| `cannot_be_merged` | Continue with resolution |
+| `can_be_merged` | Report "No conflicts to resolve" and exit |
+| `unchecked` | Wait and retry, or proceed with caution |
 
 **If no conflicts:**
 ```markdown
 ## ✅ No Conflicts
 
-PR #{number} has no merge conflicts. It's ready for review/merge.
+MR !{number} has no merge conflicts. It's ready for review/merge.
 ```
 **Exit if no conflicts.**
 
@@ -52,8 +53,9 @@ PR #{number} has no merge conflicts. It's ready for review/merge.
 
 ```bash
 # Get branch info
-PR_HEAD=$(gh pr view {number} --json headRefName --jq '.headRefName')
-PR_BASE=$(gh pr view {number} --json baseRefName --jq '.baseRefName')
+MR_JSON=$(glab mr view {number} -F json)
+PR_HEAD=$(echo "$MR_JSON" | jq -r '.source_branch')
+PR_BASE=$(echo "$MR_JSON" | jq -r '.target_branch')
 
 # Fetch latest
 git fetch origin $PR_BASE
@@ -274,13 +276,13 @@ git push --force-with-lease origin $PR_HEAD
 
 **Note**: `--force-with-lease` is safer than `--force` as it fails if someone else pushed.
 
-### 5.2 Verify PR is Now Mergeable
+### 5.2 Verify MR is Now Mergeable
 
 ```bash
-gh pr view {number} --json mergeable,mergeStateStatus
+glab mr view {number} -F json | jq -r '.merge_status'
 ```
 
-Should show `MERGEABLE`.
+Should show `can_be_merged`.
 
 **PHASE_5_CHECKPOINT:**
 - [ ] Branch pushed successfully
@@ -364,10 +366,10 @@ Resolved {N} conflicts in {M} files.
 - **Timestamp**: {ISO timestamp}
 ```
 
-### 6.2 Post GitHub Comment
+### 6.2 Post GitLab Comment
 
 ```bash
-gh pr comment {number} --body "$(cat <<'EOF'
+glab mr note create {number} --message "$(cat <<'EOF'
 ## ✅ Conflicts Resolved
 
 **Rebased onto**: `{base}`

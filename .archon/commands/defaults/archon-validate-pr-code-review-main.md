@@ -19,7 +19,8 @@ cat $ARTIFACTS_DIR/.pr-number
 
 ```bash
 PR_NUMBER=$(cat $ARTIFACTS_DIR/.pr-number | tr -d '\n')
-gh pr view "$PR_NUMBER" --json title,body,headRefName,baseRefName,labels
+glab mr view "$PR_NUMBER" -F json
+# Use .title, .description, .source_branch, .target_branch, .labels
 ```
 
 ### 1.2 Read Path Information
@@ -37,14 +38,15 @@ From the PR title, body, and linked issue(s):
 - What is the expected behavior vs actual behavior?
 - Which files/components are involved?
 
-If the PR body references a GitHub issue, fetch it:
+If the MR description references a GitLab issue, fetch it:
 
 ```bash
-# Extract issue number from PR body (looks for "Fixes #N", "Closes #N", etc.)
+# Extract issue number from MR description (looks for "Closes #N", "Fixes #N", "Resolves #N")
 PR_NUMBER=$(cat $ARTIFACTS_DIR/.pr-number | tr -d '\n')
-ISSUE_NUMBER=$(gh pr view "$PR_NUMBER" --json body -q '.body' | grep -oE '(Fixes|Closes|Resolves)\s*#[0-9]+' | grep -oE '[0-9]+' | head -1)
+ISSUE_NUMBER=$(glab mr view "$PR_NUMBER" -F json | jq -r '.description' | grep -oE '(Fixes|Closes|Resolves)\s*#[0-9]+' | grep -oE '[0-9]+' | head -1)
 if [ -n "$ISSUE_NUMBER" ]; then
-  gh issue view "$ISSUE_NUMBER" --json title,body,labels,comments
+  glab issue view "$ISSUE_NUMBER" -F json
+  glab issue note list "$ISSUE_NUMBER" -F json
 fi
 ```
 
@@ -54,11 +56,14 @@ fi
 
 ### 2.1 Read the Files That the PR Changes
 
-Get the list of changed files from the PR diff, then read those **same files on the main branch** (the canonical repo path).
+Get the list of changed files from the MR diff, then read those **same files on the main branch** (the canonical repo path).
 
 ```bash
 PR_NUMBER=$(cat $ARTIFACTS_DIR/.pr-number | tr -d '\n')
-gh pr view "$PR_NUMBER" --json files -q '.files[].path'
+# glab mr view does not expose a files array; derive from git refs.
+PR_BASE=$(glab mr view "$PR_NUMBER" -F json | jq -r '.target_branch')
+PR_HEAD=$(glab mr view "$PR_NUMBER" -F json | jq -r '.source_branch')
+git diff --name-only "origin/$PR_BASE...origin/$PR_HEAD"
 ```
 
 **CRITICAL**: Read the files from the **canonical repo** (main branch), NOT from the current worktree (feature branch). The canonical repo path is in `$ARTIFACTS_DIR/.canonical-repo`.

@@ -45,7 +45,8 @@ echo "Main repo: $CANONICAL_REPO"
 
 ```bash
 PR_NUMBER=$(cat $ARTIFACTS_DIR/.pr-number | tr -d '\n')
-gh pr view "$PR_NUMBER" --json title,body
+glab mr view "$PR_NUMBER" -F json
+# Use .title, .description
 ```
 
 ```bash

@@ -15,7 +15,8 @@ Analyze the code changes in the PR to verify the fix is correct, complete, and i
 
 ```bash
 PR_NUMBER=$(cat $ARTIFACTS_DIR/.pr-number | tr -d '\n')
-gh pr view "$PR_NUMBER" --json title,body,headRefName,baseRefName,labels
+glab mr view "$PR_NUMBER" -F json
+# Use .title, .description, .source_branch, .target_branch, .labels
 ```
 
 ```bash
@@ -38,7 +39,7 @@ cat $ARTIFACTS_DIR/.feature-branch
 
 ```bash
 PR_NUMBER=$(cat $ARTIFACTS_DIR/.pr-number | tr -d '\n')
-gh pr diff "$PR_NUMBER"
+glab mr diff "$PR_NUMBER"
 ```
 
 ### 2.2 Read Changed Files on Feature Branch
@@ -47,8 +48,10 @@ The current working directory IS the feature branch (worktree). Read each change
 
 ```bash
 PR_NUMBER=$(cat $ARTIFACTS_DIR/.pr-number | tr -d '\n')
-# List changed files
-gh pr view "$PR_NUMBER" --json files -q '.files[].path'
+# List changed files (glab mr view does not expose a files array)
+PR_BASE=$(glab mr view "$PR_NUMBER" -F json | jq -r '.target_branch')
+PR_HEAD=$(glab mr view "$PR_NUMBER" -F json | jq -r '.source_branch')
+git diff --name-only "origin/$PR_BASE...origin/$PR_HEAD"
 ```
 
 For each file, read the full file in the current working directory to understand the complete context, not just the diff hunks.

@@ -338,9 +338,9 @@ EOF
 
 ---
 
-## Phase 8: PR - Create Pull Request
+## Phase 8: MR - Create Merge Request
 
-**Before creating a PR**, check if one already exists for this issue or branch using `gh pr list`. If a PR already exists, skip creation and use the existing one.
+**Before creating an MR**, check if one already exists for this issue or branch using `glab mr list --source-branch "$(git branch --show-current)"`. If an MR already exists, skip creation and use the existing one.
 
 ### 8.1 Push to Remote
 
@@ -353,35 +353,37 @@ If branch was rebased:
 git push -u origin HEAD --force-with-lease
 ```
 
-### 8.2 Prepare PR Body
+### 8.2 Prepare MR Description
 
-Look for the project's PR template at `.github/pull_request_template.md`, `.github/PULL_REQUEST_TEMPLATE.md`, or `docs/PULL_REQUEST_TEMPLATE.md`. Read whichever one exists.
+Look for the project's MR template at `.gitlab/merge_request_templates/Default.md`, `.gitlab/merge_request_templates/default.md`, or `docs/MERGE_REQUEST_TEMPLATE.md`. Read whichever one exists.
 
-**If template found**: Use it as the structure, fill in **every section** with details from the artifact (root cause, changes, validation results, etc.). Don't skip sections or leave placeholders. Make sure to include `Fixes #{number}`.
+**If template found**: Use it as the structure, fill in **every section** with details from the artifact (root cause, changes, validation results, etc.). Don't skip sections or leave placeholders. Make sure to include `Closes #{number}`.
 
-**If no template**, write a body covering: summary, root cause, changes table, validation evidence, and `Fixes #{number}`.
+**If no template**, write a description covering: summary, root cause, changes table, validation evidence, and `Closes #{number}`.
 
-### 8.3 Create PR
+### 8.3 Create MR
 
 Write the prepared body to `$ARTIFACTS_DIR/pr-body.md`, then:
 
 ```bash
-gh pr create --title "Fix: {title} (#{number})" \
-  --body-file $ARTIFACTS_DIR/pr-body.md \
-  --base $BASE_BRANCH
+glab mr create --title "Fix: {title} (#{number})" \
+  --description "$(cat $ARTIFACTS_DIR/pr-body.md)" \
+  --target-branch $BASE_BRANCH \
+  --yes
 ```
 
-### 8.3 Get PR Number
+### 8.3 Get MR Number
 
 ```bash
-PR_URL=$(gh pr view --json url -q '.url')
-PR_NUMBER=$(gh pr view --json number -q '.number')
+MR_JSON=$(glab mr view -F json)
+PR_URL=$(echo "$MR_JSON" | jq -r '.web_url')
+PR_NUMBER=$(echo "$MR_JSON" | jq -r '.iid')
 ```
 
 **PHASE_8_CHECKPOINT:**
 - [ ] Changes pushed to remote
-- [ ] PR created
-- [ ] PR linked to issue with "Fixes #{number}"
+- [ ] MR created
+- [ ] MR linked to issue with "Closes #{number}"
 
 ---
 
@@ -511,10 +513,10 @@ Proceeding to comprehensive code review...
 - Re-run full validation
 - Note conflict resolution in PR
 
-### PR creation fails
-- Check if PR already exists for branch
+### MR creation fails
+- Check if MR already exists for branch
 - Check for permission issues
-- Provide manual gh command
+- Provide manual glab command
 
 ### Already on a branch with changes
 - Use the existing branch
