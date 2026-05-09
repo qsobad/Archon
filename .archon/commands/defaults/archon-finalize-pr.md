@@ -37,21 +37,21 @@ Extract:
 - Validation results
 - Deviations from plan (if any)
 
-### 1.2 Check for PR Template
+### 1.2 Check for MR Template
 
-**IMPORTANT**: Always check for the project's PR template first. Look for it at `.github/pull_request_template.md`, `.github/PULL_REQUEST_TEMPLATE.md`, or `docs/PULL_REQUEST_TEMPLATE.md`. Read whichever one exists.
+**IMPORTANT**: Always check for the project's MR template first. Look for it at `.gitlab/merge_request_templates/Default.md`, `.gitlab/merge_request_templates/default.md`, or `docs/MERGE_REQUEST_TEMPLATE.md`. Read whichever one exists.
 
 **If template found**: Use it as the structure, fill in **every section** with implementation details.
 **If no template**: Use the default format defined in Phase 3.
 
-### 1.3 Check for Existing PR
+### 1.3 Check for Existing MR
 
 ```bash
-gh pr list --head $(git branch --show-current) --json number,url,state
+glab mr list --source-branch "$(git branch --show-current)" -F json
 ```
 
-**If PR already exists**: Will update it instead of creating new one.
-**If no PR**: Will create new one.
+**If MR already exists**: Will update it instead of creating new one.
+**If no MR**: Will create new one.
 
 **PHASE_1_CHECKPOINT:**
 
@@ -173,9 +173,9 @@ git push origin HEAD
 **Workflow ID**: `$WORKFLOW_ID`
 ```
 
-### 3.2 Create or Update PR
+### 3.2 Create or Update MR
 
-**If no PR exists**, create one:
+**If no MR exists**, create one:
 
 ```bash
 # Write prepared body to file to avoid shell escaping
@@ -183,39 +183,42 @@ cat > $ARTIFACTS_DIR/pr-body.md <<'EOF'
 {prepared-body}
 EOF
 
-gh pr create \
+glab mr create \
   --title "{plan-title}" \
-  --body-file $ARTIFACTS_DIR/pr-body.md \
-  --base $BASE_BRANCH
+  --description "$(cat $ARTIFACTS_DIR/pr-body.md)" \
+  --target-branch $BASE_BRANCH \
+  --yes
 ```
 
-**If PR already exists**, update it:
+**If MR already exists**, update it:
 
 ```bash
-gh pr edit {pr-number} --body-file $ARTIFACTS_DIR/pr-body.md
+glab mr update {pr-number} --description "$(cat $ARTIFACTS_DIR/pr-body.md)"
 ```
 
 ### 3.3 Ensure Ready for Review
 
-If PR was created as draft, mark ready:
+If MR was created as draft, mark ready:
 
 ```bash
-gh pr ready {pr-number} 2>/dev/null || true
+glab mr update {pr-number} --ready 2>/dev/null || true
 ```
 
-### 3.4 Capture PR Info
+### 3.4 Capture MR Info
 
 ```bash
-gh pr view --json number,url,headRefName,baseRefName
+glab mr view -F json
+# Returns: iid, web_url, source_branch, target_branch (among others)
 ```
 
-### 3.5 Write PR Number Registry
+### 3.5 Write MR Number Registry
 
-Write PR number for downstream review steps:
+Write MR number for downstream review steps:
 
 ```bash
-PR_NUMBER=$(gh pr view --json number -q '.number')
-PR_URL=$(gh pr view --json url -q '.url')
+MR_JSON=$(glab mr view -F json)
+PR_NUMBER=$(echo "$MR_JSON" | jq -r '.iid')
+PR_URL=$(echo "$MR_JSON" | jq -r '.web_url')
 echo "$PR_NUMBER" > $ARTIFACTS_DIR/.pr-number
 echo "$PR_URL" > $ARTIFACTS_DIR/.pr-url
 ```
@@ -375,13 +378,13 @@ Check:
 3. Remote branch status: `git fetch origin && git status`
 ```
 
-### PR Not Found
+### MR Not Found
 
 ```
-❌ PR not found: #{number}
+❌ MR not found: !{number}
 
-The draft PR may have been closed or deleted. Create a new one:
-`gh pr create --title "..." --body "..."`
+The draft MR may have been closed or deleted. Create a new one:
+`glab mr create --title "..." --description "..." --yes`
 ```
 
 ### Template Parsing
