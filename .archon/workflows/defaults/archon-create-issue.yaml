@@ -134,10 +134,10 @@ nodes:
       echo "=== Searching for duplicates: $KEYWORDS ==="
 
       echo "--- Open Issues ---"
-      gh issue list --search "$KEYWORDS" --state open --limit 5 --json number,title,url,labels 2>/dev/null || echo "No open matches"
+      glab issue list --search "$KEYWORDS" -P 5 -F json 2>/dev/null || echo "No open matches"
 
       echo "--- Recently Closed ---"
-      gh issue list --search "$KEYWORDS" --state closed --limit 3 --json number,title,url,labels 2>/dev/null || echo "No closed matches"
+      glab issue list --search "$KEYWORDS" --closed -P 3 -F json 2>/dev/null || echo "No closed matches"
     depends_on: [classify]
 
   # ═══════════════════════════════════════════════════════════════
@@ -558,7 +558,7 @@ nodes:
 
   - id: create-issue
     prompt: |
-      Create the GitHub issue using the drafted content.
+      Create the GitLab issue using the drafted content.
 
       ## Instructions
 
@@ -568,21 +568,22 @@ nodes:
 
       4. Check which labels actually exist in the repo:
          ```bash
-         gh label list --json name -q '.[].name' | head -50
+         glab label list -F json | jq -r '.[].name' | head -50
          ```
          Only use labels that exist. Skip any suggested label that doesn't match.
 
       5. Create the issue:
          ```bash
-         gh issue create \
+         glab issue create \
            --title "$(cat "$ARTIFACTS_DIR/.issue-title")" \
-           --body-file "$ARTIFACTS_DIR/issue-draft.md" \
-           --label "label1,label2"
+           --description "$(cat "$ARTIFACTS_DIR/issue-draft.md")" \
+           --label "label1,label2" \
+           --no-editor
          ```
 
       6. Capture the result:
          ```bash
-         ISSUE_URL=$(gh issue list --limit 1 --json url -q '.[0].url')
+         ISSUE_URL=$(glab issue list -P 1 -F json | jq -r '.[0].web_url')
          echo "$ISSUE_URL" > "$ARTIFACTS_DIR/.issue-url"
          ```
 
